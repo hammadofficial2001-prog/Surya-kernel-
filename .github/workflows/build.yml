@@ -8,13 +8,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld
-      - name: Build
+        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+      - name: Fix KSU error and Build
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
+          # fix missing KSU Kconfig
+          sed -i '/kernelsu/d' drivers/Kconfig || true
+          rm -rf drivers/kernelsu || true
+          # build
           make surya-perf_defconfig
-          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb
+          # OC to 2.6GHz if possible
+          scripts/config --set-val CONFIG_MSM_KRAIT_TURBO n --set-val CONFIG_SCHEDTUNE y || true
+          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb || make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
