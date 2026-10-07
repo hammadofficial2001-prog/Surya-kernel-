@@ -6,26 +6,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fix slow Azure APT
+      - name: Fix APT
         run: |
-          sudo sed -i '/azure/d' /etc/apt/sources.list
-          sudo rm -rf /etc/apt/sources.list.d/*
-          sudo bash -c 'cat > /etc/apt/sources.list <<EOF
-          deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
-          deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
-          deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
-          EOF'
+          sudo rm -f /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*dotnet*
           sudo apt-get update -y
-
-      - name: Install deps
-        run: |
-          sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld llvm gcc-aarch64-linux-gnu
+          sudo apt-get install -y --fix-missing bc bison flex libssl-dev libelf-dev build-essential clang lld llvm gcc-aarch64-linux-gnu
 
       - name: Build Kernel 2.6GHz
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
-          export KBUILD_BUILD_USER=Surya
           make surya_defconfig || make vendor/surya_defconfig
           make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- Image.gz-dtb -k
           ls -lh arch/arm64/boot/
