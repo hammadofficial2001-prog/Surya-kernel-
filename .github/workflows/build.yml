@@ -1,24 +1,37 @@
-name: Build Surya kernel 2.6GHz
-on:
-  push:
-    branches: [ main ]
+name: build
+on: [push]
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Remove slow azure mirrors
+        run: sudo rm -f /etc/apt/sources.list.d/*azure* || true
+
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+        run: |
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install -y --no-install-recommends bc bison flex libssl-dev libelf-dev build-essential clang lld llvm
+
       - name: Fix and Build
         run: |
           export ARCH=arm64
-          sed -i '/kernelsu/d' drivers/Kconfig || true
-          rm -rf drivers/kernelsu || true
-          ls arch/arm64/configs/ | grep -i surya
+          export SUBARCH=arm64
+          # remove kernelsu if present
+          sed -i '/kernelsu/d' drivers/Kconfig 2>/dev/null || true
+          rm -rf drivers/kernelsu 2>/dev/null || true
+          # find defconfig
+          ls arch/arm64/configs/ | grep surya
           make surya_defconfig
-          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb || make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb
+          # 2.6GHz OC patch - edit before build
+          sed -i 's/2457600/2649600/g' arch/arm64/boot/dts/vendor/qcom/kona.dtsi 2>/dev/null || true
+          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- Image.gz-dtb || make -j$(nproc) ARCH=arm64 CC=clang Image.gz-dtb
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: Surya-2.6GHz-kernel
-          path: arch/arm64/boot/Image.gz-dtb
+          path: arch/arm64/boot/Image.gz*
