@@ -1,0 +1,22 @@
+name: Build Surya kernel 2.6GHz
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld
+      - name: Build
+        run: |
+          export ARCH=arm64
+          export SUBARCH=arm64
+          make surya-perf_defconfig
+          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz-dtb
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Surya-2.6GHz-kernel
+          path: arch/arm64/boot/Image.gz-dtb
