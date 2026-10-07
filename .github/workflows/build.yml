@@ -8,27 +8,26 @@ jobs:
 
       - name: Fix slow Azure APT
         run: |
-          # azure wala source hatao
           sudo sed -i '/azure/d' /etc/apt/sources.list
           sudo rm -rf /etc/apt/sources.list.d/*
-          # ubuntu ke official source lagao
-          echo "deb http://archive.ubuntu.com/ubuntu jammy main universe" | sudo tee /etc/apt/sources.list
-          echo "deb http://archive.ubuntu.com/ubuntu jammy-updates main universe" | sudo tee -a /etc/apt/sources.list
-          sudo apt-get update
+          sudo bash -c 'cat > /etc/apt/sources.list <<EOF
+          deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+          deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+          deb http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+          EOF'
+          sudo apt-get update -y
 
       - name: Install deps
         run: |
-          sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld llvm aarch64-linux-gnu-gcc
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld llvm gcc-aarch64-linux-gnu
 
       - name: Build Kernel 2.6GHz
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
           export KBUILD_BUILD_USER=Surya
-          # defconfig dhundo
-          ls arch/arm64/configs/ | grep -i surya
-          make surya_defconfig
-          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- Image.gz-dtb -k || true
+          make surya_defconfig || make vendor/surya_defconfig
+          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- Image.gz-dtb -k
           ls -lh arch/arm64/boot/
 
       - name: Upload Image
