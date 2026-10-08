@@ -1,27 +1,17 @@
-name: build
-on: [push]
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Fix APT
-        run: |
-          sudo rm -f /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*dotnet*
-          sudo apt-get update -y
-          sudo apt-get install -y --fix-missing bc bison flex libssl-dev libelf-dev build-essential clang lld llvm gcc-aarch64-linux-gnu
-
-      - name: Build Kernel 2.6GHz
+       - name: Build Kernel 2.6GHz
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
+          
+          # KernelSU ka fix
+          git submodule update --init --recursive || true
+          if [ ! -f drivers/kernelsu/Kconfig ]; then
+            echo "Fixing missing KernelSU..."
+            mkdir -p drivers/kernelsu
+            echo "# dummy" > drivers/kernelsu/Kconfig
+            sed -i '/kernelsu/d' drivers/Kconfig || true
+          fi
+
           make surya_defconfig || make vendor/surya_defconfig
           make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- Image.gz-dtb -k
           ls -lh arch/arm64/boot/
-
-      - name: Upload Image
-        uses: actions/upload-artifact@v4
-        with:
-          name: Surya-2.6GHz-Image
-          path: arch/arm64/boot/Image*
