@@ -9,24 +9,27 @@ jobs:
           fetch-depth: 0
           submodules: false
 
-      - name: Fix APT
+      - name: Fix APT and Install
         run: |
           sudo rm -f /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*dotnet*
           sudo apt-get update -y
           sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld llvm gcc-aarch64-linux-gnu
 
-            - name: Fix KSU and Build
-          run: |
+      - name: Fix KSU and Build Kernel
+        run: |
           export ARCH=arm64
           export SUBARCH=arm64
           rm -rf KernelSU-Next
-          git config -f .gitmodules --remove-section submodule.KernelSU-Next || true
           rm -rf drivers/kernelsu
           mkdir -p drivers/kernelsu
-          printf 'config KSU\n\tbool "dummy"\n' > drivers/kernelsu/Kconfig
-          sed -i '/kernelsu/d' drivers/Kconfig
-          sed -i '/KernelSU-Next/d' .gitmodules || true
-
+          echo 'config KSU' > drivers/kernelsu/Kconfig
+          sed -i '/kernelsu/d' drivers/Kconfig || true
           make surya_defconfig
           make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- Image.gz-dtb
           ls -lh arch/arm64/boot/
+
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Surya-2.6GHz-Image
+          path: arch/arm64/boot/Image*
