@@ -1,17 +1,28 @@
-       - name: Build Kernel 2.6GHz
+name: build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Fix APT
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*dotnet*
+          sudo apt-get update -y
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev build-essential clang lld llvm gcc-aarch64-linux-gnu
+
+      - name: Fix KSU and Build
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
-          
-          # KernelSU ka fix
-          git submodule update --init --recursive || true
-          if [ ! -f drivers/kernelsu/Kconfig ]; then
-            echo "Fixing missing KernelSU..."
+          # agar KSU folder khali ho to usko fix karo
+          if [ ! -s drivers/kernelsu/Kconfig ]; then
+            echo "Creating dummy KSU to avoid build break"
             mkdir -p drivers/kernelsu
-            echo "# dummy" > drivers/kernelsu/Kconfig
-            sed -i '/kernelsu/d' drivers/Kconfig || true
-          fi
-
-          make surya_defconfig || make vendor/surya_defconfig
-          make -j$(nproc) CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- Image.gz-dtb -k
-          ls -lh arch/arm64/boot/
+            echo 'config KSU' > drivers/kernelsu/Kconfig
+            echo ' bool "KSU dummy"' >> drivers/kernelsu/Kconfig
+            #
